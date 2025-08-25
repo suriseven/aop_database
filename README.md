@@ -10,10 +10,11 @@
 
 # ***ETL Pipeline***
 ### ToxCast
-<img width="1275" height="680" alt="Database_construction_Fig1" src="https://github.com/user-attachments/assets/bd989dcf-687a-498d-a332-ef27dea486e6" />
+<img width="1071" height="476" alt="Database_construction_Fig1" src="https://github.com/user-attachments/assets/2d42b24d-6062-4a4c-905a-b9ffe5e09325" />
+<img width="1275" height="722" alt="Database_construction_Fig2" src="https://github.com/user-attachments/assets/3c8c4432-24ac-4053-8c34-e7ac726a7e02" />
 
 ### AOP-Wiki
-<img width="2539" height="681" alt="Database_construction_Fig2" src="https://github.com/user-attachments/assets/05bb6932-72c4-4fd0-9ba6-6357668b69ac" />
+<img width="1734" height="1456" alt="Database_construction_aopwiki" src="https://github.com/user-attachments/assets/37c3ed02-02c3-4576-b6e0-40ddcac1d707" />
 
 ### ToxCast-AOPWiki bridge
-<img width="1026" height="514" alt="Database_construction_Fig3" src="https://github.com/user-attachments/assets/801bf228-df0d-4024-8fc1-c2e7cec01aca" />
+<img width="895" height="546" alt="Database_construction_neo4j" src="https://github.com/user-attachments/assets/68266b39-5587-42c6-ad79-1e7600f88446" />
