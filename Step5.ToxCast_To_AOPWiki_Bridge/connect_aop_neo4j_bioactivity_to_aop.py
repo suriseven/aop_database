@@ -23,7 +23,7 @@ with driver.session() as session:
         ORDER BY b.id
         SKIP {skip} LIMIT {batch_size}
         UNWIND b.aop_ids AS aop_id
-        MATCH (a:AOP {{id: aop_id}})
+        MATCH (a:AOP {{aop_id: toString(aop_id)}})
         MERGE (b)-[:RELATED_TO_AOP]->(a)
         WITH b
         RETURN count(*) AS affected
@@ -36,7 +36,7 @@ with driver.session() as session:
         print(f"Batch starting at {skip}: {affected} relationships created/merged")
         skip += batch_size
 
-        if skip > 2760000:
+        if skip > 3230000:
             break
 
 driver.close()
