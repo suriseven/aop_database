@@ -2,6 +2,7 @@ import os
 import json
 import pandas as pd
 from neo4j import GraphDatabase
+import re
 
 assay_base_dir = '/home/ubuntu/toxcast_rawdata/assays'
 
@@ -14,40 +15,110 @@ neo4j_password = neo4j_info["password"]
 
 driver = GraphDatabase.driver(neo4j_uri, auth=(neo4j_user, neo4j_password))
 
-def create_graph(tx, chemical, assay_name, result):
-    tx.run("""
-        MERGE (c:Chemical {dtxsid: $dtxsid})
-        SET c.name = $name, c.casrn = $casrn, c.formula = $formula, c.mass = $mass
 
-        MERGE (a:Assay {name: $assay_name})
+def parse_assay_name(filename):
+    pattern = r"Assay List (.+)-\d{4}-\d{2}-\d{2}\.xlsx"
+    match = re.match(pattern, filename)
+    if match:
+        return match.group(1)
 
-        MERGE (c)-[r:HAS_RESULT {assay: $assay_name}]->(a)
-        SET r.hitc = $hitc, r.ac50 = $ac50, r.logac50 = $logac50,
-            r.top = $top, r.scaled_top = $scaled_top
-    """, {
-        "dtxsid": chemical["DTXSID"],
-        "name": chemical["PREFERRED NAME"],
-        "casrn": chemical["CASRN"],
-        "formula": chemical["MOLECULAR FORMULA"],
-        "mass": chemical["MONOISOTOPIC MASS"] if not pd.isna(chemical["MONOISOTOPIC MASS"]) else None,
-        "assay_name": assay_name,
-        "hitc": result["HIT CALL"] if not pd.isna(result["HIT CALL"]) else None,
-        "ac50": float(result["AC50"]) if not pd.isna(result["AC50"]) else None,
-        "logac50": float(result["LOGAC50"]) if not pd.isna(result["LOGAC50"]) else None,
-        "top": float(result["TOP"]) if not pd.isna(result["TOP"]) else None,
-        "scaled_top": float(result["SCALED TOP"]) if not pd.isna(result["SCALED TOP"]) else None,
-    })
+    return None
+
+
+def create_assay_batch(tx, rows):
+    query = """
+    UNWIND $rows AS row
+
+    CREATE (a:Assay)
+    SET a = row
+    """
+
+    tx.run(query, rows=rows)
 
 
 with driver.session() as session:
-    for filename in os.listdir(assay_base_dir):
-        if filename.endswith(".xlsx"):
-            filepath = os.path.join(assay_base_dir, filename)
-            assay_name = os.path.splitext(filename)[0].split('-')[0].replace('Assay List ','')
+    for root, dirs, files in os.walk(assay_base_dir):
+        for f in files:
+            if f.endswith(".xlsx"):
+                file_path = os.path.join(root, f)
+                assay_name = parse_assay_name(f)
 
-            df = pd.read_excel(filepath)
+                if assay_name is None:
+                    print(f"Skip : {f}")
+                    continue
 
-            print(df)
+                print(f"Loading : {assay_name}")
 
-            for _, row in df.iterrows():
-                session.execute_write(create_graph, row, assay_name, row)
+                df = pd.read_excel(file_path)
+
+                rows = []
+
+                for _, row in df.iterrows():
+
+                    props = {
+                        "name": assay_name,
+
+                        "dtxsid": row["DTXSID"],
+                        "preferred_name": row["PREFERRED NAME"],
+                        "casrn": row["CASRN"],
+                        "molecular_formula": row["MOLECULAR FORMULA"],
+                        "monoisotopic_mass": row["MONOISOTOPIC MASS"],
+
+                        "toxcast_active": row["ToxCast Active"],
+                        "toxcast_total": row["ToxCast Total"],
+                        "toxcast_active_percent": row["% ToxCast Active"],
+
+                        "hit_call": row["HIT CALL"],
+
+                        "top": row["TOP"],
+                        "scaled_top": row["SCALED TOP"],
+
+                        "ac50": row["AC50"],
+                        "logac50": row["LOGAC50"]
+                    }
+
+                    rows.append(props)
+                    # print(props)
+
+                session.execute_write(
+                    create_assay_batch,
+                    rows
+                )
+
+                print(f"Done : {assay_name}")
+
+
+driver.close()
+
+
+# Post processing to build relations
+#
+# CALL apoc.periodic.iterate(
+# '
+# MATCH (c:Chemical)
+# RETURN c
+# ',
+# '
+# MATCH (a:Assay {dtxsid:c.dtxsid})
+# MERGE (c)-[:HAS_ASSAY_RESULT]->(a)
+# ',
+# {
+#     batchSize:10,
+#     parallel:false
+# }
+# );
+
+# CALL apoc.periodic.iterate(
+# '
+# MATCH (c:cHTSMT)
+# RETURN c
+# ',
+# '
+# MATCH (a:Assay {name:c.assay})
+# MERGE (c)-[:HAS_ASSAY]->(a)
+# ',
+# {
+#     batchSize:10,
+#     parallel:false
+# }
+# );
